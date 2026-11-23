@@ -155,7 +155,7 @@ func TestStoragePoolBackendOrder(t *testing.T) {
 	b := (&poolTestBackend{name: "b:uuid"}).backend()
 	b.datasetsFn = nil // Btrfs does not expose datasets.
 	z.datasetsFn = func() ([]zfs.Dataset, error) {
-		return []zfs.Dataset{{Name: "tank/data", Mountpoint: "/tank", Used: 10}}, nil
+		return []zfs.Dataset{{Name: "tank/data", Mounted: true, Mountpoint: "/tank", Used: 10}}, nil
 	}
 	m := &StoragePoolManager{backends: []*poolBackend{b, z}, detailInterval: time.Hour}
 	var stats system.Stats
@@ -186,8 +186,8 @@ func TestUpdatePopulatesZfsPools(t *testing.T) {
 	}
 	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
 		return []zfs.Dataset{
-			{Name: "tank/apps", Used: 5000000000000, Avail: 11999000000000, Mountpoint: "/tank/apps"},
-			{Name: "tank/backup", Used: 6000000000000, Avail: 11999000000000, Mountpoint: "/tank/backup"},
+			{Name: "tank/apps", Used: 5000000000000, Avail: 11999000000000, Mounted: true, Mountpoint: "/tank/apps"},
+			{Name: "tank/backup", Used: 6000000000000, Avail: 11999000000000, Mounted: true, Mountpoint: "/tank/backup"},
 			// Small zvol (Proxmox VM EFI disk): must not round to zero.
 			{Name: "rpool/vm-100-disk-2", Used: 4194304, Avail: 0, Mountpoint: "-"},
 		}, nil
@@ -314,8 +314,8 @@ func TestDatasetUsage(t *testing.T) {
 	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
 		calls++
 		return []zfs.Dataset{
-			{Name: "tank", Used: 12000000000000, Avail: 11999000000000, Mountpoint: "/tank"},
-			{Name: "tank/apps", Used: 1000000000000, Avail: 11999000000000, Mountpoint: "/tank/apps"},
+			{Name: "tank", Used: 12000000000000, Avail: 11999000000000, Mounted: true, Mountpoint: "/tank"},
+			{Name: "tank/apps", Used: 1000000000000, Avail: 11999000000000, Mounted: true, Mountpoint: "/tank/apps"},
 			{Name: "rpool", Used: 900000000000, Avail: 300000000000, Mountpoint: "-"}, // zvol/unmounted: excluded
 		}, nil
 	}
@@ -331,10 +331,24 @@ func TestDatasetUsage(t *testing.T) {
 	assert.Equal(t, 1, calls)
 }
 
+func TestDatasetUsageIgnoresUnmountedDatasets(t *testing.T) {
+	zm := &StoragePoolManager{detailInterval: time.Hour, backends: []*poolBackend{{name: "zfs"}}}
+	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
+		return []zfs.Dataset{
+			{Name: "zroot/ROOT/default", Used: 7, Avail: 100, Mounted: true, Mountpoint: "/"},
+			{Name: "zroot/ROOT/pre-upgrade", Used: 1, Avail: 100, Mountpoint: "/"},
+			{Name: "zroot/usr", Used: 3, Avail: 100, Mountpoint: "/usr"}, // canmount=off
+		}, nil
+	}
+
+	assert.Equal(t, map[string]zfsDatasetUsage{"/": {used: 7, avail: 100}}, zm.DatasetUsage())
+	assert.Equal(t, map[string]bool{"/": true}, zm.ZfsMountpoints())
+}
+
 func TestDatasetUsageRefreshOnErrorKeepsPrevious(t *testing.T) {
 	zm := &StoragePoolManager{detailInterval: time.Hour, backends: []*poolBackend{{name: "zfs"}}}
 	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
-		return []zfs.Dataset{{Name: "tank", Used: 1, Avail: 1, Mountpoint: "/tank"}}, nil
+		return []zfs.Dataset{{Name: "tank", Used: 1, Avail: 1, Mounted: true, Mountpoint: "/tank"}}, nil
 	}
 	assert.Len(t, zm.DatasetUsage(), 1)
 
@@ -442,8 +456,8 @@ func TestZfsMountpoints(t *testing.T) {
 	zm := &StoragePoolManager{detailInterval: time.Hour, backends: []*poolBackend{{name: "zfs"}}}
 	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
 		return []zfs.Dataset{
-			{Name: "tank", Mountpoint: "/tank"},
-			{Name: "rpool/ROOT/pve-1", Mountpoint: "/"},
+			{Name: "tank", Mounted: true, Mountpoint: "/tank"},
+			{Name: "rpool/ROOT/pve-1", Mounted: true, Mountpoint: "/"},
 		}, nil
 	}
 	mountpoints := zm.ZfsMountpoints()
@@ -554,7 +568,7 @@ func TestStaleUtilityCachesRefreshInBackground(t *testing.T) {
 	}
 	b.datasetsFn = func() ([]zfs.Dataset, error) {
 		<-release
-		return []zfs.Dataset{{Name: "new", Mountpoint: "/new"}}, nil
+		return []zfs.Dataset{{Name: "new", Mounted: true, Mountpoint: "/new"}}, nil
 	}
 	b.poolData = []zfs.PoolStat{{Name: "old"}}
 	b.lastPoolStats = time.Now().Add(-2 * poolStatsRefreshInterval)

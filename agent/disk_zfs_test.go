@@ -20,7 +20,7 @@ func TestUpdateDiskUsageZfsMountpoint(t *testing.T) {
 	zm := &StoragePoolManager{detailInterval: time.Hour, backends: []*poolBackend{{name: "zfs"}}}
 	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
 		return []zfs.Dataset{
-			{Name: "tank", Used: 12000000000000, Avail: 11999000000000, Mountpoint: "/tank"},
+			{Name: "tank", Used: 12000000000000, Avail: 11999000000000, Mounted: true, Mountpoint: "/tank"},
 		}, nil
 	}
 	agent := &Agent{
@@ -47,7 +47,7 @@ func TestUpdateDiskUsageZfsRootPopulatesSystemStats(t *testing.T) {
 	zm := &StoragePoolManager{detailInterval: time.Hour, backends: []*poolBackend{{name: "zfs"}}}
 	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
 		return []zfs.Dataset{
-			{Name: "rpool/ROOT/pve-1", Used: 900000000000, Avail: 300000000000, Mountpoint: "/"},
+			{Name: "rpool/ROOT/pve-1", Used: 900000000000, Avail: 300000000000, Mounted: true, Mountpoint: "/"},
 		}, nil
 	}
 	agent := &Agent{
@@ -88,7 +88,7 @@ func TestUpdateDiskUsageWithoutZfsManager(t *testing.T) {
 func TestInitializeDiskIoStatsSkipsZfsMountpoints(t *testing.T) {
 	zm := &StoragePoolManager{detailInterval: time.Hour, backends: []*poolBackend{{name: "zfs"}}}
 	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
-		return []zfs.Dataset{{Name: "tank", Mountpoint: "/tank"}}, nil
+		return []zfs.Dataset{{Name: "tank", Mounted: true, Mountpoint: "/tank"}}, nil
 	}
 	agent := &Agent{
 		fsStats: map[string]*system.FsStats{
@@ -115,7 +115,7 @@ func TestInitializeDiskIoStatsSkipsZfsMountpoints(t *testing.T) {
 func TestInitializeDiskIoStatsKeepsZfsRootDisk(t *testing.T) {
 	zm := &StoragePoolManager{detailInterval: time.Hour, backends: []*poolBackend{{name: "zfs"}}}
 	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
-		return []zfs.Dataset{{Name: "zroot/ROOT/default", Mountpoint: "/"}}, nil
+		return []zfs.Dataset{{Name: "zroot/ROOT/default", Mounted: true, Mountpoint: "/"}}, nil
 	}
 	agent := &Agent{
 		fsStats: map[string]*system.FsStats{

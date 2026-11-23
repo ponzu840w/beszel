@@ -239,14 +239,14 @@ func TestDatasetsDelegatesWhenDevZfsPresent(t *testing.T) {
 	oldCommandOutput := commandOutput
 	commandOutput = func(name string, args ...string) ([]byte, error) {
 		assert.Equal(t, "zfs", name)
-		assert.Equal(t, []string{"list", "-Hp", "-o", "name,used,avail,mountpoint"}, args)
-		return []byte("tank\t50\t50\t/tank\n"), nil
+		assert.Equal(t, []string{"list", "-Hp", "-o", "name,used,avail,mounted,mountpoint"}, args)
+		return []byte("tank\t50\t50\tyes\t/tank\n"), nil
 	}
 	t.Cleanup(func() { commandOutput = oldCommandOutput })
 
 	datasets, err := Datasets()
 	require.NoError(t, err)
-	assert.Equal(t, []Dataset{{Name: "tank", Used: 50, Avail: 50, Mountpoint: "/tank"}}, datasets)
+	assert.Equal(t, []Dataset{{Name: "tank", Used: 50, Avail: 50, Mounted: true, Mountpoint: "/tank"}}, datasets)
 }
 
 func TestPoolStatsDelegatesToZpoolWhenDevZfsPresent(t *testing.T) {

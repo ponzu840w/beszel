@@ -20,7 +20,7 @@ func TestCollectorsUseUtilitiesOnNonLinux(t *testing.T) {
 			if slices.Contains(args, "-d") {
 				return []byte("tank\t40\t60\tnone\n"), nil
 			}
-			return []byte("tank\t50\t50\t/tank\n"), nil
+			return []byte("tank\t50\t50\tyes\t/tank\n"), nil
 		default:
 			t.Fatalf("unexpected command %s", name)
 			return nil, nil
@@ -34,5 +34,5 @@ func TestCollectorsUseUtilitiesOnNonLinux(t *testing.T) {
 	assert.Equal(t, []string{"tank"}, *lastPoolNames.Load())
 	datasets, err := Datasets()
 	require.NoError(t, err)
-	assert.Equal(t, []Dataset{{Name: "tank", Used: 50, Avail: 50, Mountpoint: "/tank"}}, datasets)
+	assert.Equal(t, []Dataset{{Name: "tank", Used: 50, Avail: 50, Mounted: true, Mountpoint: "/tank"}}, datasets)
 }

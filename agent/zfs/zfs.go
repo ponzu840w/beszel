@@ -65,7 +65,8 @@ type Dataset struct {
 	Name       string
 	Used       uint64
 	Avail      uint64
-	Mountpoint string
+	Mounted    bool
+	Mountpoint string // may be shared, e.g. by boot environments at "/"
 }
 
 // PoolStats returns capacity and health for all pools on the system using
@@ -159,7 +160,7 @@ func Datasets() ([]Dataset, error) {
 	if err := checkZfsDevice(); err != nil {
 		return nil, err
 	}
-	out, err := commandOutput("zfs", "list", "-Hp", "-o", "name,used,avail,mountpoint")
+	out, err := commandOutput("zfs", "list", "-Hp", "-o", "name,used,avail,mounted,mountpoint")
 	if err != nil {
 		return nil, fmt.Errorf("zfs list: %w", err)
 	}
@@ -206,8 +207,9 @@ func parseZpoolListOutput(out []byte) ([]PoolStat, error) {
 	return pools, scanner.Err()
 }
 
-// parseZfsListOutput parses `zfs list -Hp -o name,used,avail,mountpoint` output.
-// The mountpoint column may contain spaces, so it is split on tabs only.
+// parseZfsListOutput parses `zfs list -Hp -o name,used,avail,mounted,mountpoint`
+// output. The mountpoint column may contain spaces, so it is split on tabs only.
+// Volumes report "-" for mounted.
 func parseZfsListOutput(out []byte) ([]Dataset, error) {
 	var datasets []Dataset
 	scanner := bufio.NewScanner(bytes.NewReader(out))
@@ -216,8 +218,8 @@ func parseZfsListOutput(out []byte) ([]Dataset, error) {
 		if line == "" {
 			continue
 		}
-		fields := strings.SplitN(line, "\t", 4)
-		if len(fields) < 4 {
+		fields := strings.SplitN(line, "\t", 5)
+		if len(fields) < 5 {
 			return nil, fmt.Errorf("unexpected zfs list line: %q", line)
 		}
 		used, err := strconv.ParseUint(fields[1], 10, 64)
@@ -232,7 +234,8 @@ func parseZfsListOutput(out []byte) ([]Dataset, error) {
 			Name:       fields[0],
 			Used:       used,
 			Avail:      avail,
-			Mountpoint: fields[3],
+			Mounted:    fields[3] == "yes",
+			Mountpoint: fields[4],
 		})
 	}
 	return datasets, scanner.Err()

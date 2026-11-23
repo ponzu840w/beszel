@@ -63,8 +63,15 @@ func TestParseZfsListOutput(t *testing.T) {
 	assert.Equal(t, "/tank/my media", datasets[3].Mountpoint)
 	// Unmounted datasets/zvols report "-".
 	assert.Equal(t, "-", datasets[4].Mountpoint)
+	assert.False(t, datasets[4].Mounted)
+	assert.True(t, datasets[0].Mounted)
 	assert.Equal(t, uint64(12000000000000), datasets[0].Used)
 	assert.Equal(t, uint64(11999000000000), datasets[0].Avail)
+
+	// An inactive boot environment keeps the "/" mountpoint.
+	datasets, err = parseZfsListOutput([]byte("zroot/ROOT/old\t1\t2\tno\t/\n"))
+	require.NoError(t, err)
+	assert.Equal(t, []Dataset{{Name: "zroot/ROOT/old", Used: 1, Avail: 2, Mountpoint: "/"}}, datasets)
 }
 
 func TestParseRootDatasetOutput(t *testing.T) {

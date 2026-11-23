@@ -286,6 +286,8 @@ func (b *poolBackend) refreshDatasetUsage() map[string]zfsDatasetUsage {
 
 // storeDatasetUsage rebuilds the usage map from a dataset listing. The map is
 // replaced rather than mutated so returned references stay safe to read.
+// Only mounted datasets are kept: inactive boot environments share "/" with
+// the active one, and canmount=off parents name a mountpoint they never use.
 // Callers must hold cacheMu.
 func (b *poolBackend) storeDatasetUsage(datasets []zfs.Dataset, err error) {
 	if err != nil {
@@ -293,7 +295,7 @@ func (b *poolBackend) storeDatasetUsage(datasets []zfs.Dataset, err error) {
 	} else {
 		usage := make(map[string]zfsDatasetUsage, len(datasets))
 		for _, ds := range datasets {
-			if ds.Mountpoint != "" && ds.Mountpoint != "-" {
+			if ds.Mounted && ds.Mountpoint != "" && ds.Mountpoint != "-" {
 				usage[ds.Mountpoint] = zfsDatasetUsage{used: ds.Used, avail: ds.Avail}
 			}
 		}

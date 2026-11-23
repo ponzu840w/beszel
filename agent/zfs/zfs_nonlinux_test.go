@@ -31,6 +31,7 @@ func TestCollectorsUseUtilitiesOnNonLinux(t *testing.T) {
 	pools, err := PoolStats()
 	require.NoError(t, err)
 	assert.Equal(t, []PoolStat{{Name: "tank", Size: 100, Alloc: 40, Free: 60, Health: "ONLINE"}}, pools)
+	assert.Equal(t, []string{"tank"}, *lastPoolNames.Load())
 	datasets, err := Datasets()
 	require.NoError(t, err)
 	assert.Equal(t, []Dataset{{Name: "tank", Used: 50, Avail: 50, Mountpoint: "/tank"}}, datasets)

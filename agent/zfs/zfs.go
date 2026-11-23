@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -83,11 +84,27 @@ func PoolStats() ([]PoolStat, error) {
 		return nil, fmt.Errorf("zpool list: %w", err)
 	}
 	pools, err := parseZpoolListOutput(out)
+	if err == nil {
+		rememberPoolNames(pools)
+	}
 	if err != nil || len(pools) == 0 {
 		return pools, err
 	}
 	applyRootDatasetCapacity(pools)
 	return pools, nil
+}
+
+// lastPoolNames holds the pools from the last successful PoolStats call. The
+// FreeBSD sysctl tree cannot list pools cheaply, so PoolKernelStats reads the
+// counters of these pools there.
+var lastPoolNames atomic.Pointer[[]string]
+
+func rememberPoolNames(pools []PoolStat) {
+	names := make([]string, len(pools))
+	for i := range pools {
+		names[i] = pools[i].Name
+	}
+	lastPoolNames.Store(&names)
 }
 
 // applyRootDatasetCapacity replaces the raw `zpool list` figures, which include

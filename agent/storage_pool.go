@@ -25,8 +25,8 @@ type zfsDatasetUsage struct {
 const datasetUsageRefreshInterval = 5 * time.Minute
 
 // poolStatsRefreshInterval controls how often `zpool list` is re-run for pool
-// capacity. Health and I/O are read from procfs on Linux, so the utility only
-// needs to refresh slow-moving space accounting.
+// capacity. Health and I/O are read from kernel kstats on Linux and FreeBSD, so
+// the utility only needs to refresh slow-moving space accounting.
 const poolStatsRefreshInterval = time.Minute
 
 // btrfsFilesystems is the btrfs source; overridable in tests.
@@ -51,7 +51,7 @@ type poolBackend struct {
 	name           string
 	poolStatsFn    func() ([]zfs.PoolStat, error)       // capacity/health source
 	datasetsFn     func() ([]zfs.Dataset, error)        // dataset inventory source
-	kernelStatsFn  func() ([]zfs.PoolKernelStat, error) // procfs pool state/I/O source
+	kernelStatsFn  func() ([]zfs.PoolKernelStat, error) // kstat pool state/I/O source
 	poolStatusesFn func() ([]zfs.PoolStatus, error)     // scrub/vdev detail source
 
 	// Utility-backed caches below are refreshed in the background after the
@@ -139,9 +139,9 @@ func btrfsSource[T any](convert func(btrfs.Filesystem) T) func() ([]T, error) {
 }
 
 // Update refreshes systemStats.ZfsPools with the latest pool data. I/O
-// throughput and health come from inexpensive kernel kstats on Linux. Pool
-// capacity and dataset usage come from separately cached utility calls. The
-// pool map is empty when both backends are absent.
+// throughput and health come from inexpensive kernel kstats on Linux and
+// FreeBSD. Pool capacity and dataset usage come from separately cached utility
+// calls. The pool map is empty when both backends are absent.
 func (m *StoragePoolManager) Update(systemStats *system.Stats) {
 	// Rebuild the combined map so successful pool removals clear old samples.
 	systemStats.ZfsPools = nil

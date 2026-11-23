@@ -602,19 +602,18 @@ func (a *Agent) initializeDiskIoStats(diskIoCounters map[string]disk.IOCountersS
 	a.fsNames = a.fsNames[:0]
 	now := time.Now()
 	// ZFS datasets have no /proc/diskstats entry, so they are excluded from
-	// I/O tracking instead of warning about a missing device (#1541).
+	// I/O tracking without warning about a missing device (#1541). A disk
+	// named by FILESYSTEM for a ZFS root keeps its I/O.
 	var zfsMountpoints map[string]bool
 	if a.storagePoolManager != nil {
 		zfsMountpoints = a.storagePoolManager.ZfsMountpoints()
 	}
 	for device, stats := range a.fsStats {
-		if zfsMountpoints[stats.Mountpoint] {
-			continue
-		}
-		// skip if not in diskIoCounters
 		d, exists := diskIoCounters[device]
 		if !exists {
-			slog.Warn("Device not found in diskstats", "name", device)
+			if !zfsMountpoints[stats.Mountpoint] {
+				slog.Warn("Device not found in diskstats", "name", device)
+			}
 			continue
 		}
 		// populate initial values

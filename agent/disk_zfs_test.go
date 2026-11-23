@@ -108,3 +108,29 @@ func TestInitializeDiskIoStatsSkipsZfsMountpoints(t *testing.T) {
 	// ZFS entry is present but untouched by diskstats initialization.
 	assert.Equal(t, uint64(0), agent.fsStats["tank"].TotalRead)
 }
+
+// TestInitializeDiskIoStatsKeepsZfsRootDisk verifies that FILESYSTEM=ada0 on
+// a ZFS root keeps root I/O when another disk is tracked too. An empty name
+// list makes disk.IOCounters return every device, which used to hide this.
+func TestInitializeDiskIoStatsKeepsZfsRootDisk(t *testing.T) {
+	zm := &StoragePoolManager{detailInterval: time.Hour, backends: []*poolBackend{{name: "zfs"}}}
+	zm.backends[0].datasetsFn = func() ([]zfs.Dataset, error) {
+		return []zfs.Dataset{{Name: "zroot/ROOT/default", Mountpoint: "/"}}, nil
+	}
+	agent := &Agent{
+		fsStats: map[string]*system.FsStats{
+			"ada0": {Root: true, Mountpoint: "/"},
+			"ada1": {Mountpoint: "/extra-filesystems/ada1__HDD"},
+		},
+		storagePoolManager: zm,
+		diskPrev:           make(map[uint16]map[string]prevDisk),
+	}
+
+	agent.initializeDiskIoStats(map[string]disk.IOCountersStat{
+		"ada0": {Name: "ada0", ReadBytes: 100},
+		"ada1": {Name: "ada1", ReadBytes: 200},
+	})
+
+	assert.ElementsMatch(t, []string{"ada0", "ada1"}, agent.fsNames)
+	assert.Equal(t, uint64(100), agent.fsStats["ada0"].TotalRead)
+}

@@ -235,6 +235,30 @@ func TestUpdateKernelStatsMissing(t *testing.T) {
 	assert.Equal(t, uint64(0), stats.ZfsPools["tank"].WriteBytes)
 }
 
+func TestUnsupportedKernelStatsHideIO(t *testing.T) {
+	for _, tc := range []struct {
+		err        error
+		wantHideIO bool
+	}{
+		{errors.ErrUnsupported, true},
+		{fmt.Errorf("kstat: %w", errors.ErrUnsupported), true},
+		{zfs.ErrNoZfs, false},
+		{errors.New("read failed"), false},
+		{nil, false},
+	} {
+		t.Run(fmt.Sprint(tc.err), func(t *testing.T) {
+			z := (&poolTestBackend{name: "tank"}).backend()
+			z.kernelStatsFn = func() ([]zfs.PoolKernelStat, error) { return nil, tc.err }
+			b := (&poolTestBackend{name: "b:uuid"}).backend()
+			zm := &StoragePoolManager{backends: []*poolBackend{z, b}, detailInterval: time.Hour}
+			var stats system.Stats
+			zm.Update(&stats)
+			assert.Equal(t, tc.wantHideIO, stats.ZfsPools["tank"].HideIO)
+			assert.False(t, stats.ZfsPools["b:uuid"].HideIO, "only the unsupported backend's pools are hidden")
+		})
+	}
+}
+
 func TestUpdateKernelCounterReset(t *testing.T) {
 	zm := &StoragePoolManager{detailInterval: time.Hour, backends: []*poolBackend{{name: "zfs"}}}
 	zm.backends[0].poolStatsFn = func() ([]zfs.PoolStat, error) {

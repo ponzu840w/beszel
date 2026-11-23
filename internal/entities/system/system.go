@@ -68,7 +68,7 @@ type Stats struct {
 type ZfsPool struct {
 	DisplayName string  `json:"n,omitempty" cbor:"8,keyasint,omitempty"`
 	HideUsage   bool    `json:"hu,omitzero" cbor:"6,keyasint,omitempty"` // equivalent filesystem usage chart exists
-	HideIO      bool    `json:"hi,omitzero" cbor:"7,keyasint,omitempty"` // equivalent filesystem I/O chart exists
+	HideIO      bool    `json:"hi,omitzero" cbor:"7,keyasint,omitempty"` // equivalent filesystem I/O chart exists, or pool I/O is not collected on this platform
 	Raw         bool    `json:"raw,omitzero" cbor:"5,keyasint,omitempty"`
 	Total       float64 `json:"d" cbor:"0,keyasint"`                     // total capacity in GiB
 	Used        float64 `json:"du" cbor:"1,keyasint"`                    // allocated in GiB

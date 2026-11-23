@@ -87,7 +87,7 @@ func newZfsBackend() *poolBackend {
 		name:           "zfs",
 		poolStatsFn:    optionalPoolSource(zfs.PoolStats),
 		datasetsFn:     optionalPoolSource(zfs.Datasets),
-		kernelStatsFn:  optionalPoolSource(zfs.PoolKernelStats),
+		kernelStatsFn:  zfs.PoolKernelStats, // unwrapped so kernelStats sees ErrUnsupported
 		poolStatusesFn: optionalPoolSource(zfs.PoolStatuses),
 	}
 }
@@ -113,11 +113,15 @@ func (b *poolBackend) datasets() ([]zfs.Dataset, error) {
 func optionalPoolSource[T any](source func() ([]T, error)) func() ([]T, error) {
 	return func() ([]T, error) {
 		items, err := source()
-		if errors.Is(err, zfs.ErrNoZfs) || errors.Is(err, exec.ErrNotFound) || errors.Is(err, errors.ErrUnsupported) {
+		if isAbsentSource(err) {
 			return nil, nil
 		}
 		return items, err
 	}
+}
+
+func isAbsentSource(err error) bool {
+	return errors.Is(err, zfs.ErrNoZfs) || errors.Is(err, exec.ErrNotFound) || errors.Is(err, errors.ErrUnsupported)
 }
 
 func btrfsSource[T any](convert func(btrfs.Filesystem) T) func() ([]T, error) {
@@ -153,7 +157,7 @@ func (b *poolBackend) updateBackendStats(systemStats *system.Stats) {
 		return
 	}
 
-	kernelStats, ioRates := b.kernelStats()
+	kernelStats, ioRates, ioUnsupported := b.kernelStats()
 
 	if systemStats.ZfsPools == nil {
 		systemStats.ZfsPools = make(map[string]*system.ZfsPool, len(pools))
@@ -168,6 +172,7 @@ func (b *poolBackend) updateBackendStats(systemStats *system.Stats) {
 			Total:       float64(pool.Size) / (1024 * 1024 * 1024),
 			Used:        float64(pool.Alloc) / (1024 * 1024 * 1024),
 			Health:      pool.Health,
+			HideIO:      ioUnsupported,
 		}
 		if kernel, exists := kernelStats[pool.Name]; exists && kernel.Health != "" {
 			stats.Health = kernel.Health
@@ -221,15 +226,19 @@ func (b *poolBackend) storePoolStats(pools []zfs.PoolStat, err error) {
 
 // kernelStats reads cumulative pool counters and converts them to per-second
 // rates. Counter decreases indicate a pool export/import and reset the
-// baseline instead of producing an underflow spike.
-func (b *poolBackend) kernelStats() (map[string]zfs.PoolKernelStat, map[string]zfs.PoolIoStats) {
+// baseline instead of producing an underflow spike. The bool reports a
+// platform without per-pool counters, where the rates would always be zero.
+func (b *poolBackend) kernelStats() (map[string]zfs.PoolKernelStat, map[string]zfs.PoolIoStats, bool) {
 	if b.kernelStatsFn == nil {
-		return nil, nil
+		return nil, nil, false
 	}
 	stats, err := b.kernelStatsFn()
-	if err != nil {
+	if errors.Is(err, errors.ErrUnsupported) {
+		return nil, nil, true
+	}
+	if err != nil && !isAbsentSource(err) {
 		slog.Debug("Storage pool kernel stats unavailable", "backend", b.name, "err", err)
-		return nil, nil
+		return nil, nil, false
 	}
 	now := time.Now()
 	byName := make(map[string]zfs.PoolKernelStat, len(stats))
@@ -248,7 +257,7 @@ func (b *poolBackend) kernelStats() (map[string]zfs.PoolKernelStat, map[string]z
 		nextSamples[stat.Name] = poolKernelSample{nread: stat.NRead, nwrite: stat.NWrite, at: now}
 	}
 	b.kernelSamples = nextSamples
-	return byName, rates
+	return byName, rates, false
 }
 
 // refreshDatasetUsage re-runs `zfs list` when the refresh window has elapsed

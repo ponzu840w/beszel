@@ -1,5 +1,7 @@
 # Beszel
 
+This is a fork of [henrygd/beszel](https://github.com/henrygd/beszel) v0.21.2 whose agent hides ZFS pool I/O charts on FreeBSD, where per-pool I/O counters are not collected.
+
 Beszel is a lightweight server monitoring platform that includes Docker statistics, historical data, and alert functions.
 
 It has a friendly web interface, simple configuration, and is ready to use out of the box. It supports automatic backup, multi-user, OAuth authentication, and API access.

@@ -1,6 +1,6 @@
 # Beszel
 
-This is a fork of [henrygd/beszel](https://github.com/henrygd/beszel) v0.21.2 with agent fixes for ZFS pool I/O on FreeBSD and for disk I/O when the root filesystem is on ZFS.
+This is a fork of [henrygd/beszel](https://github.com/henrygd/beszel) v0.21.2 with agent fixes for ZFS pool I/O on FreeBSD and for root disk I/O and usage on ZFS.
 
 Beszel is a lightweight server monitoring platform that includes Docker statistics, historical data, and alert functions.
 
